@@ -32,6 +32,10 @@ pennywise summary --month 2026-04
 pennywise list --month 2026-04
 pennywise list --month 2026-04 --type expense
 
+# Search notes/categories with an inclusive date range; category matching is exact.
+pennywise search "lunch" --from 2026-04-01 --to 2026-04-30 --type expense
+pennywise search --category food
+
 # Set a monthly category limit; summary shows amount spent and remaining/overage.
 pennywise budget set food 350.00 --month 2026-04
 pennywise budget list --month 2026-04
@@ -40,6 +44,8 @@ pennywise budget list --month 2026-04
 pennywise export april.csv --month 2026-04
 pennywise import april.csv
 ```
+
+To remove an incorrectly entered row, first find its ID with `list` or `search`, then run `pennywise delete ID`.
 
 ### Example output
 
@@ -74,6 +80,8 @@ Amounts are stored as integer cents to avoid floating-point accounting errors. T
 |---|---|
 | `add income\|expense AMOUNT CATEGORY [--date DATE] [--note TEXT]` | Add a record |
 | `list [--month YYYY-MM] [--type income\|expense]` | List matching records |
+| `search [TEXT] [--category NAME] [--from DATE] [--to DATE] [--type TYPE]` | Search notes/categories and filter by inclusive date range or type |
+| `delete ID` | Delete one transaction by its numeric ID |
 | `summary [--month YYYY-MM]` | Monthly totals, expense categories and budgets |
 | `budget set CATEGORY AMOUNT --month YYYY-MM` | Create or update a budget |
 | `budget list [--month YYYY-MM]` | Show budget usage |
@@ -83,6 +91,7 @@ Amounts are stored as integer cents to avoid floating-point accounting errors. T
 ## Development and tests
 
 ```bash
+python -m pip install -e .
 python -m unittest discover -s tests -v
 ```
 

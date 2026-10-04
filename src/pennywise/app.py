@@ -124,6 +124,45 @@ def get_transactions(conn: sqlite3.Connection, month: str | None = None,
     return list(conn.execute(sql, params))
 
 
+def search_transactions(conn: sqlite3.Connection, text: str | None = None,
+                        category: str | None = None, start: str | None = None,
+                        end: str | None = None, kind: str | None = None) -> list[sqlite3.Row]:
+    """Search transaction notes/categories and optionally narrow by date or type."""
+    clauses, params = [], []
+    if text and text.strip():
+        clauses.append("(lower(category) LIKE ? OR lower(note) LIKE ?)")
+        pattern = f"%{text.strip().casefold()}%"
+        params.extend((pattern, pattern))
+    if category and category.strip():
+        clauses.append("lower(category) = ?")
+        params.append(category.strip().casefold())
+    if start:
+        clauses.append("occurred_on >= ?")
+        params.append(_validate_date(start))
+    if end:
+        clauses.append("occurred_on <= ?")
+        params.append(_validate_date(end))
+    if start and end and start > end:
+        raise ValueError("start date must not be after end date")
+    if kind:
+        if kind not in {"income", "expense"}:
+            raise ValueError("type must be income or expense")
+        clauses.append("kind = ?")
+        params.append(kind)
+    sql = "SELECT * FROM transactions"
+    if clauses:
+        sql += " WHERE " + " AND ".join(clauses)
+    sql += " ORDER BY occurred_on DESC, id DESC"
+    return list(conn.execute(sql, params))
+
+
+def delete_transaction(conn: sqlite3.Connection, transaction_id: int) -> bool:
+    """Delete one transaction; return False when its ID does not exist."""
+    with conn:
+        cur = conn.execute("DELETE FROM transactions WHERE id=?", (transaction_id,))
+    return cur.rowcount > 0
+
+
 def set_budget(conn: sqlite3.Connection, month: str, category: str, amount: str) -> None:
     validate_month(month)
     category = category.strip()
@@ -220,6 +259,14 @@ def build_parser() -> argparse.ArgumentParser:
     l = sub.add_parser("list", help="list transactions")
     l.add_argument("--month", help="filter by YYYY-MM")
     l.add_argument("--type", choices=["income", "expense"])
+    q = sub.add_parser("search", help="search notes/categories and filter by date or type")
+    q.add_argument("text", nargs="?", help="case-insensitive substring in category or note")
+    q.add_argument("--category", help="exact category name (case-insensitive)")
+    q.add_argument("--from", dest="start", help="start date, inclusive (YYYY-MM-DD)")
+    q.add_argument("--to", dest="end", help="end date, inclusive (YYYY-MM-DD)")
+    q.add_argument("--type", choices=["income", "expense"])
+    d = sub.add_parser("delete", help="delete a transaction by ID")
+    d.add_argument("id", type=int)
     s = sub.add_parser("summary", help="show monthly totals, categories and budget usage")
     s.add_argument("--month", default=date.today().strftime("%Y-%m"))
     b = sub.add_parser("budget", help="manage monthly category budgets")
@@ -244,6 +291,17 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"Added {args.type} #{row_id}: {args.category} {money(to_cents(args.amount))}")
             elif args.command == "list":
                 _print_rows(get_transactions(conn, args.month, args.type))
+            elif args.command == "search":
+                rows = search_transactions(conn, args.text, args.category, args.start, args.end, args.type)
+                _print_rows(rows)
+                if not rows:
+                    print("No matching transactions.")
+            elif args.command == "delete":
+                if args.id < 1:
+                    raise ValueError("transaction ID must be positive")
+                if not delete_transaction(conn, args.id):
+                    raise ValueError(f"transaction not found: {args.id}")
+                print(f"Deleted transaction #{args.id}.")
             elif args.command == "summary":
                 data = summary(conn, args.month)
                 print(f"Summary for {data['month']}\nIncome:  {money(data['income_cents'])}\n"

@@ -3,9 +3,9 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from pennywise.app import (add_transaction, budget_status, connect, export_csv,
-                           get_transactions, import_csv, money, set_budget, summary, to_cents,
-                           _validate_date)
+from pennywise.app import (add_transaction, budget_status, connect, delete_transaction,
+                           export_csv, get_transactions, import_csv, money,
+                           search_transactions, set_budget, summary, to_cents, _validate_date)
 
 
 class LedgerTests(unittest.TestCase):
@@ -67,6 +67,18 @@ class LedgerTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "line 3"):
             import_csv(self.conn, path)
         self.assertEqual(len(get_transactions(self.conn)), 0)
+
+    def test_search_filters_and_delete(self):
+        first = add_transaction(self.conn, "expense", "8.99", "Books", "2026-04-10", "Python guide")
+        add_transaction(self.conn, "expense", "12", "food", "2026-04-11", "Lunch")
+        self.assertEqual([r["id"] for r in search_transactions(
+            self.conn, text="python", start="2026-04-01", end="2026-04-30", kind="expense")], [first])
+        self.assertEqual([r["category"] for r in search_transactions(self.conn, category="FOOD")], ["food"])
+        with self.assertRaisesRegex(ValueError, "after"):
+            search_transactions(self.conn, start="2026-05-01", end="2026-04-01")
+        self.assertTrue(delete_transaction(self.conn, first))
+        self.assertFalse(delete_transaction(self.conn, first))
+        self.assertEqual(len(get_transactions(self.conn)), 1)
 
 
 if __name__ == "__main__":
