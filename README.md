@@ -72,7 +72,7 @@ pennywise --db ./demo.sqlite3 add expense 12.50 coffee
 PENNYWISE_DB=./ledger.sqlite3 pennywise summary
 ```
 
-Amounts are stored as integer cents to avoid floating-point accounting errors. The CLI accepts positive values with at most two decimal places. Dates must be ISO `YYYY-MM-DD`; month filters use `YYYY-MM`. CSV imports are validated in full before any rows are inserted, so a malformed row does not result in a partial import. CSV headers are `date,type,amount,category,note`.
+Amounts are stored as integer cents to avoid floating-point accounting errors. The CLI accepts positive values with at most two decimal places. Dates must be ISO `YYYY-MM-DD`; month filters use `YYYY-MM`. Category matching for searches and budgets is case-insensitive, so a budget for `Food` also tracks transactions categorized as `food`; setting the same budget with different capitalization updates it rather than creating a duplicate. CSV imports are validated in full before any rows are inserted, so a malformed row does not result in a partial import. CSV headers are `date,type,amount,category,note`.
 
 ## Commands
 

@@ -168,9 +168,17 @@ def set_budget(conn: sqlite3.Connection, month: str, category: str, amount: str)
     category = category.strip()
     if not category:
         raise ValueError("category cannot be empty")
-    conn.execute("INSERT INTO budgets(month, category, amount_cents) VALUES(?,?,?) "
-                 "ON CONFLICT(month, category) DO UPDATE SET amount_cents=excluded.amount_cents",
-                 (month, category, to_cents(amount)))
+    cents = to_cents(amount)
+    existing = conn.execute(
+        "SELECT category FROM budgets WHERE month=? AND lower(category)=lower(?) "
+        "ORDER BY category LIMIT 1", (month, category)
+    ).fetchone()
+    if existing:
+        conn.execute("UPDATE budgets SET amount_cents=? WHERE month=? AND category=?",
+                     (cents, month, existing["category"]))
+    else:
+        conn.execute("INSERT INTO budgets(month, category, amount_cents) VALUES(?,?,?)",
+                     (month, category, cents))
     conn.commit()
 
 
@@ -180,7 +188,8 @@ def budget_status(conn: sqlite3.Connection, month: str) -> list[dict[str, int | 
         SELECT b.category, b.amount_cents AS budget_cents,
                COALESCE(SUM(t.amount_cents), 0) AS spent_cents
         FROM budgets b LEFT JOIN transactions t
-          ON t.category=b.category AND t.kind='expense' AND substr(t.occurred_on,1,7)=b.month
+          ON lower(t.category)=lower(b.category) AND t.kind='expense'
+             AND substr(t.occurred_on,1,7)=b.month
         WHERE b.month=? GROUP BY b.category, b.amount_cents ORDER BY b.category COLLATE NOCASE
     """, (month,)).fetchall()
     return [dict(r) for r in rows]

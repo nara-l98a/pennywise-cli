@@ -42,6 +42,15 @@ class LedgerTests(unittest.TestCase):
         self.assertEqual(len(get_transactions(self.conn, "2026-04", "expense")), 1)
         self.assertEqual(budget_status(self.conn, "2026-04")[0]["budget_cents"], 5000)
 
+    def test_budget_matches_category_case_insensitively_and_updates(self):
+        add_transaction(self.conn, "expense", "12.50", "food", "2026-04-03")
+        set_budget(self.conn, "2026-04", "Food", "50")
+        set_budget(self.conn, "2026-04", "FOOD", "60")
+        budgets = budget_status(self.conn, "2026-04")
+        self.assertEqual(len(budgets), 1)
+        self.assertEqual(budgets[0]["spent_cents"], 1250)
+        self.assertEqual(budgets[0]["budget_cents"], 6000)
+
     def test_csv_round_trip(self):
         add_transaction(self.conn, "expense", "8.99", "books", "2026-04-10", "reference")
         exported = self.root / "transactions.csv"
